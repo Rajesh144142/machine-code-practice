@@ -168,6 +168,11 @@ Key difference:
 - `checkout` is older and does many things (switch branches, restore files).
 - `switch` is newer and only for branches, so it is safer and clearer.
 
+Important notes:
+- `git checkout <branch>` switches branches. Git blocks the switch if it would overwrite your local changes.
+- If there is no conflict, your uncommitted changes can follow you into the other branch.
+- `git checkout -- <file>` discards local changes in that file (restores from last commit).
+
 ## Merge Conflicts
 
 A merge conflict happens when two branches change the same lines in a file and Git can’t decide which to keep.
