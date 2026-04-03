@@ -66,6 +66,58 @@ Recommendation: `/srv/myapp/`
 - SSL certs: `/etc/letsencrypt/live/myapp.com/`
 - DB data: `/var/lib/postgresql/`
 
+## Full‑Stack Example (Story)
+
+Scenario:
+- Backend: Node.js API (2 app servers)
+- Frontend: React (served by Nginx)
+- DB: 1 master + 1 replica
+- 1 proxy/load balancer with round‑robin
+
+### Proxy Server (load balancer)
+
+Purpose: single public entry point, SSL, and routing.
+- Nginx config: `/etc/nginx/sites-available/myapp`
+- SSL certs: `/etc/letsencrypt/live/myapp.com/`
+- Access logs: `/var/log/nginx/`
+
+Why: clients hit one IP, proxy distributes traffic to app servers.
+
+### App Server 1 and App Server 2
+
+Purpose: run Node API and serve React build.
+- App code: `/srv/myapp/`
+- Backend env: `/etc/myapp/.env`
+- React build: `/srv/myapp/public/` or `/var/www/myapp/`
+- App logs: `/var/log/myapp/`
+- Service file: `/etc/systemd/system/myapp.service`
+
+Why: scaling horizontally and rolling deploys.
+
+### DB Master Server
+
+Purpose: write traffic only.
+- Data files: `/var/lib/postgresql/` or `/var/lib/mysql/`
+- Config: `/etc/postgresql/` or `/etc/mysql/`
+- Logs: `/var/log/postgresql/` or `/var/log/mysql/`
+
+Why: single source of truth for writes.
+
+### DB Replica Server
+
+Purpose: read traffic only.
+- Data files: `/var/lib/postgresql/` or `/var/lib/mysql/`
+- Config: `/etc/postgresql/` or `/etc/mysql/`
+- Logs: `/var/log/postgresql/` or `/var/log/mysql/`
+
+Why: offload heavy read queries from master.
+
+### Traffic Flow (Simple)
+
+User → Proxy (Nginx, SSL) → App Server (API + React) → DB Master/Replica
+
+Reads go to replica, writes go to master.
+
 ## Quick Rules
 
 - Code in `/srv` or `/opt`
