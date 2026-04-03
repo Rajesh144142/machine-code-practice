@@ -1,130 +1,152 @@
 ﻿# Linux Server Layout - Where Things Go (Web Apps)
 
-This guide shows common locations for a full‑stack app on Linux. Paths can vary slightly by distro, but these are the usual defaults.
+This is a beginner‑friendly guide. It shows where files usually live on a Linux server and why.
 
-## Common Folders (Quick Meaning)
+## Common Folders (Simple Meaning)
 
-- `/home` - user home directories
-- `/var` - variable data (logs, caches, databases)
-- `/etc` - system config files
-- `/opt` - optional apps you install manually
-- `/srv` - service data (app files)
-- `/usr/local` - manually installed software
+- `/home` = user home folders
+- `/etc` = configuration files
+- `/var` = logs, caches, databases (things that change often)
+- `/srv` = app code for services
+- `/opt` = apps you install manually
+- `/usr/local` = software you installed yourself
 
-## Recommended Layout For A Web App
+## Basic Web App Layout (Recommended)
 
-### App code (repo)
+### 1) App code (your repo)
 
-Common choices:
-- `/srv/myapp/` (clean, service‑oriented)
-- `/opt/myapp/` (if you install as a package/app)
-- `/home/ubuntu/myapp/` (simple, but less “server‑style”)
+Put it here:
+- `/srv/myapp/`
 
-Recommendation: `/srv/myapp/`
+Why:
+- `/srv` is meant for service code.
 
-### Environment files / secrets
+### 2) Config and secrets
 
-- `/etc/myapp/` for config files
-- Use `.env` under app only if locked down: `chmod 600`
+Put it here:
+- `/etc/myapp/` (example: `/etc/myapp/.env`)
 
-### Logs
+Why:
+- `/etc` is for config files.
 
+### 3) Logs
+
+Put it here:
 - App logs: `/var/log/myapp/`
 - Nginx logs: `/var/log/nginx/`
 
-### Database data
+Why:
+- Logs change often, so they belong in `/var/log`.
 
+### 4) Database data
+
+Put it here:
 - PostgreSQL: `/var/lib/postgresql/`
-- MySQL/MariaDB: `/var/lib/mysql/`
+- MySQL: `/var/lib/mysql/`
 
-### Static files / uploads
+Why:
+- Databases store changing data in `/var/lib`.
 
-- `/var/www/myapp/` or `/srv/myapp/public/`
+### 5) Static files (React build)
 
-### SSL certificates
+Put it here:
+- `/srv/myapp/public/` or `/var/www/myapp/`
 
+### 6) SSL certificates
+
+Put it here:
 - Let’s Encrypt: `/etc/letsencrypt/`
 - Manual certs: `/etc/ssl/` or `/etc/nginx/ssl/`
 
 ## Nginx (Reverse Proxy)
 
-- Config files: `/etc/nginx/`
-- Site configs:
-  - Debian/Ubuntu: `/etc/nginx/sites-available/` and `/etc/nginx/sites-enabled/`
-  - RHEL/CentOS: `/etc/nginx/conf.d/`
+Where config goes:
+- `/etc/nginx/`
+- Ubuntu: `/etc/nginx/sites-available/` and `/etc/nginx/sites-enabled/`
+- CentOS/RHEL: `/etc/nginx/conf.d/`
 
-## Systemd Services (App Process)
+Why:
+- Nginx reads its config from `/etc/nginx`.
 
-- Service files: `/etc/systemd/system/myapp.service`
+## Systemd Service (Run the App)
 
-## Example Real‑World Setup
+Put the service file here:
+- `/etc/systemd/system/myapp.service`
 
-- App code: `/srv/myapp/`
-- App env: `/etc/myapp/.env`
-- App logs: `/var/log/myapp/`
+Why:
+- System services live under `/etc/systemd/system`.
+
+## Simple Example (Single Server)
+
+You have one server with Node + React:
+- Code: `/srv/myapp/`
+- Config: `/etc/myapp/.env`
+- React build: `/srv/myapp/public/`
+- Logs: `/var/log/myapp/`
 - Nginx config: `/etc/nginx/sites-available/myapp`
 - SSL certs: `/etc/letsencrypt/live/myapp.com/`
-- DB data: `/var/lib/postgresql/`
 
-## Full‑Stack Example (Story)
+## Full‑Stack Example (2 App Servers + 2 DB Servers + 1 Proxy)
 
-Scenario:
-- Backend: Node.js API (2 app servers)
-- Frontend: React (served by Nginx)
-- DB: 1 master + 1 replica
-- 1 proxy/load balancer with round‑robin
+### Goal
 
-### Proxy Server (load balancer)
+- Users hit one public IP
+- Proxy spreads traffic to two app servers
+- DB writes go to master, reads go to replica
 
-Purpose: single public entry point, SSL, and routing.
+### Proxy Server (Load Balancer)
+
+What goes here:
 - Nginx config: `/etc/nginx/sites-available/myapp`
 - SSL certs: `/etc/letsencrypt/live/myapp.com/`
-- Access logs: `/var/log/nginx/`
+- Logs: `/var/log/nginx/`
 
-Why: clients hit one IP, proxy distributes traffic to app servers.
+Why:
+- Proxy is the front door for users.
 
 ### App Server 1 and App Server 2
 
-Purpose: run Node API and serve React build.
+What goes here:
 - App code: `/srv/myapp/`
-- Backend env: `/etc/myapp/.env`
-- React build: `/srv/myapp/public/` or `/var/www/myapp/`
-- App logs: `/var/log/myapp/`
-- Service file: `/etc/systemd/system/myapp.service`
+- Config: `/etc/myapp/.env`
+- React build: `/srv/myapp/public/`
+- Logs: `/var/log/myapp/`
+- Service: `/etc/systemd/system/myapp.service`
 
-Why: scaling horizontally and rolling deploys.
+Why:
+- Two app servers give scaling and failover.
 
-### DB Master Server
+### DB Master Server (Write)
 
-Purpose: write traffic only.
-- Data files: `/var/lib/postgresql/` or `/var/lib/mysql/`
+What goes here:
+- Data: `/var/lib/postgresql/` or `/var/lib/mysql/`
 - Config: `/etc/postgresql/` or `/etc/mysql/`
 - Logs: `/var/log/postgresql/` or `/var/log/mysql/`
 
-Why: single source of truth for writes.
+Why:
+- Only one DB accepts writes.
 
-### DB Replica Server
+### DB Replica Server (Read)
 
-Purpose: read traffic only.
-- Data files: `/var/lib/postgresql/` or `/var/lib/mysql/`
+What goes here:
+- Data: `/var/lib/postgresql/` or `/var/lib/mysql/`
 - Config: `/etc/postgresql/` or `/etc/mysql/`
 - Logs: `/var/log/postgresql/` or `/var/log/mysql/`
 
-Why: offload heavy read queries from master.
+Why:
+- Replica handles heavy read traffic.
 
 ### Traffic Flow (Simple)
 
-User → Proxy (Nginx, SSL) → App Server (API + React) → DB Master/Replica
+User → Proxy (Nginx) → App Server → DB (master for writes, replica for reads)
 
-Reads go to replica, writes go to master.
+## Quick Rules (Easy To Remember)
 
-## Quick Rules
-
-- Code in `/srv` or `/opt`
-- Config in `/etc`
-- Logs in `/var/log`
-- DB data in `/var/lib`
-- Certs in `/etc/letsencrypt`
+- Code → `/srv`
+- Config → `/etc`
+- Logs → `/var/log`
+- DB data → `/var/lib`
+- SSL certs → `/etc/letsencrypt`
 
 ## Create Users and Assign Access
 
@@ -138,7 +160,7 @@ Add user to a group:
 sudo usermod -aG www-data appuser
 ```
 
-Give ownership of an app folder:
+Give ownership of app code:
 ```bash
 sudo chown -R appuser:www-data /srv/myapp
 ```
@@ -148,7 +170,27 @@ Set permissions:
 sudo chmod -R 750 /srv/myapp
 ```
 
-Real life example:
+Meaning:
 - App runs as `appuser`
 - Nginx runs as `www-data`
-- Group access lets Nginx read app files without giving full access to everyone
+- Group access lets Nginx read app files
+
+## Should You Run the App as Root?
+
+No. Run your app as a normal user.
+
+Why:
+- Root has full access. If the app is hacked, the whole server is at risk.
+
+When to use root:
+- Installing packages
+- Editing system configs
+- Binding to privileged ports (80/443) via Nginx
+
+## What About DB, Nginx, and Other Services?
+
+- App: run as a normal user (example: `appuser`)
+- Database: run as its own service user (`postgres`, `mysql`)
+- Nginx: runs as `www-data` or `nginx`
+- Background workers (queues): run as a normal user or a service user
+- Never run these as root
