@@ -173,6 +173,18 @@ Important notes:
 - If there is no conflict, your uncommitted changes can follow you into the other branch.
 - `git checkout -- <file>` discards local changes in that file (restores from last commit).
 
+## Delete Branches
+
+Local branch:
+- `git branch -d branch_name` (safe delete, only if merged)
+- `git branch -D branch_name` (force delete)
+
+Remote branch:
+- `git push origin --delete branch_name`
+
+Note:
+- Deleting remote does not delete local, and vice‑versa.
+
 ## Merge Conflicts
 
 A merge conflict happens when two branches change the same lines in a file and Git can’t decide which to keep.

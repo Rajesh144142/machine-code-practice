@@ -11,3 +11,7 @@ This file lists the learning notes and guides in this workspace.
 ## SQL
 
 - `sql\README.md` - SQL fundamentals, examples, and best practices
+
+## Git
+
+- `git\README.md` - Git commands, conflicts, and daily workflow
