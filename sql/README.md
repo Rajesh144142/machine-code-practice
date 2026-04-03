@@ -63,6 +63,18 @@ CREATE TABLE payments (
 
 ## Basic DDL and DML
 
+Create database:
+
+```sql
+CREATE DATABASE mydb;
+```
+
+Use database:
+
+```sql
+USE mydb;
+```
+
 Create table:
 
 ```sql
@@ -77,6 +89,12 @@ Alter table:
 
 ```sql
 ALTER TABLE customers ADD COLUMN email VARCHAR(255);
+```
+
+Rename column:
+
+```sql
+ALTER TABLE customers RENAME COLUMN name TO full_name;
 ```
 
 Update data:
