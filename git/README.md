@@ -283,3 +283,35 @@ History becomes linear, but commits are rewritten.
 What “Rebase daily, merge early” means:
 - **Rebase daily**: update your feature branch with the latest `main` every day.
 - **Merge early**: merge small changes sooner instead of waiting for huge batches.
+
+## Daily Routine (Low‑Conflict)
+
+Start of day:
+1. `git switch main`
+2. `git pull`
+3. `git switch feature/your-branch`
+4. `git pull --rebase origin main`
+
+During the day:
+1. Make small changes
+2. `git add .`
+3. `git commit -m "small focused change"`
+
+Before pushing:
+1. `git pull --rebase origin main`
+2. `git push`
+
+## If You Forgot To Commit Yesterday
+
+Option A (commit now):
+- `git status`
+- `git add .`
+- `git commit -m "work in progress"`
+
+Option B (stash, sync, then re‑apply):
+- `git stash`
+- `git switch main`
+- `git pull`
+- `git switch feature/your-branch`
+- `git pull --rebase origin main`
+- `git stash pop`
