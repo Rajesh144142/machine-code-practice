@@ -271,3 +271,15 @@ History becomes linear, but commits are rewritten.
 - Resolve conflicts locally before pushing.
 - Use feature branches for new work.
 - Protect `main` with PRs and required checks.
+
+## How To Reduce Merge Conflicts
+
+- Rebase daily to keep your branch close to `main`.
+- Merge early so branches don’t drift.
+- Keep branches short‑lived.
+- Split big files into smaller modules.
+- Coordinate when multiple people edit the same file.
+
+What “Rebase daily, merge early” means:
+- **Rebase daily**: update your feature branch with the latest `main` every day.
+- **Merge early**: merge small changes sooner instead of waiting for huge batches.
