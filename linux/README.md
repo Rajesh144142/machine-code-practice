@@ -1,4 +1,4 @@
-﻿# Linux Fundamentals - Permissions (chmod, chown)
+# Linux Fundamentals - Permissions, Mounts, and Symlinks
 
 This README explains file permissions and ownership in plain language.
 
@@ -140,3 +140,107 @@ wc -w file.txt    # just words
 ```
 
 Real life example: count lines in a log to estimate request volume.
+
+---
+
+## Mounts vs. Symbolic Links (Symlinks)
+
+In Linux, managing filesystems and shortcuts involves two key concepts: **Mounts** and **Symbolic Links (Symlinks)**. Here is how they work and differ.
+
+### 1. What is a Mount?
+A **Mount** associates a physical storage device or partition (like a hard drive, USB flash drive, or network drive) with a specific directory in the Linux directory tree.
+* **Why it exists**: Linux does not use drive letters (like `C:` or `D:`). Everything resides under a single root directory `/`. To read a USB drive, you must "mount" it to a folder directory.
+* **Kernel Level**: Mounting is a system-level operation managed by the kernel and requires administrator (`sudo`) privileges.
+
+### 2. What is a Symbolic Link (Symlink)?
+A **Symbolic Link** (also called a soft link) is a special shortcut file that points to another file or directory on the system.
+* **Why it exists**: Similar to a Windows desktop shortcut. It lets you create a fast path to a file buried deep in the folder hierarchy.
+* **User Level**: Any user can create a symlink for files they own; it doesn't require root privileges.
+* **Dangling Link**: If the original target file is deleted, the symlink remains but becomes "broken".
+
+---
+
+### Key Differences
+
+| Feature | Mount | Symbolic Link (Symlink) |
+| :--- | :--- | :--- |
+| **Concept** | Attaching hardware/filesystem to a folder. | Creating a shortcut pointer file. |
+| **Target** | Hard drive partition, USB device, ISO, NFS share. | Any existing file or directory path. |
+| **Command** | `sudo mount /dev/sdb1 /mnt/usb` | `ln -s /path/to/target /path/to/shortcut` |
+| **Privileges** | Requires administrator (`root` / `sudo`). | User level (no `sudo` needed). |
+| **Persistence** | Disappears on reboot (unless added to `/etc/fstab`). | Permanent until you delete the shortcut file. |
+
+---
+
+### General Examples
+
+#### A. Mount Example: Accessing a USB Drive
+When you plug in a USB drive, Linux represents the hardware as a device file (e.g., `/dev/sdb1`). You cannot read it directly; you must mount it:
+
+```bash
+# 1. Create an empty directory to act as the mount point
+mkdir -p /mnt/myusb
+
+# 2. Mount the USB partition to that directory
+sudo mount /dev/sdb1 /mnt/myusb
+
+# 3. Now you can view the USB files inside the folder
+ls -la /mnt/myusb
+
+# 4. Before pulling the USB out, unmount it safely
+sudo umount /mnt/myusb
+```
+
+#### B. Symbolic Link Example: Config Shortcut
+If you frequently edit an Nginx configuration file at `/etc/nginx/nginx.conf`, you can create a symlink in your home folder so you don't have to navigate there every time:
+
+```bash
+# Syntax: ln -s <real_target_path> <shortcut_name>
+ln -s /etc/nginx/nginx.conf ~/nginx-shortcut.conf
+
+# Now you can view or edit the file directly using the shortcut:
+cat ~/nginx-shortcut.conf
+```
+
+---
+
+## Directory Level: Folder Mount (Bind Mount) vs. Directory Symlink
+
+If you want to link or mirror one folder (`/source/folder`) into another directory (`/target/folder`), you can do this in two ways.
+
+### 1. The Directory Symlink (Shortcut)
+This creates a simple pointer file that redirects requests to the source directory.
+
+* **Command**:
+  ```bash
+  ln -s /source/folder /target/folder
+  ```
+* **Pros**: Simple, does not require `sudo` to create, and deleting the link `/target/folder` only deletes the shortcut, not the source files.
+* **Cons**: Some applications/services (like Nginx, Apache, FTP servers, or Docker) disable following symlinks by default for security.
+
+### 2. The Folder Bind Mount
+This mounts the source directory directly to the target directory. It makes the target folder behave exactly like a real physical directory containing those files.
+
+* **Command**:
+  ```bash
+  # 1. Create target folder if it doesn't exist
+  mkdir -p /target/folder
+
+  # 2. Mount source directory to target directory (requires sudo)
+  sudo mount --bind /source/folder /target/folder
+  ```
+* **Pros**:
+  * Invisible to application security policies (behaves exactly like a real directory).
+  * Works inside `chroot` jails or container boundaries.
+  * You can mount folders across different physical hard drives or network locations.
+* **Cons**:
+  * Requires `root`/`sudo` privileges.
+  * **Danger**: If you run `rm -rf /target/folder/*` while it is mounted, you will delete the files in `/source/folder`!
+  * Disappears on reboot unless registered in `/etc/fstab`.
+
+#### Unmounting a Bind Mount
+When you are done, unmount the folder:
+```bash
+sudo umount /target/folder
+```
+

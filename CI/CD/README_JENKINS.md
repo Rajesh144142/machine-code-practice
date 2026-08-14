@@ -1,4 +1,4 @@
-﻿# CI/CD Learning - Jenkins (Fundamentals)
+# CI/CD Learning - Jenkins (Fundamentals)
 
 This README is the starting point for learning Jenkins CI/CD. We will begin with fundamentals and expand step by step.
 
@@ -131,6 +131,43 @@ pipeline {
 - `development` → run CI checks for dev environment
 - `staging` → run CI checks for staging environment
 - `main` → run CI checks for production environment
+
+## Running a Particular File/Script
+
+In Jenkins pipeline scripts (defined in a `Jenkinsfile`), you execute commands inside a `steps` block using shell/terminal directives.
+
+### 1. Linux/Unix Agents (`sh`)
+Use the `sh` step to execute Unix commands:
+```groovy
+    stage('Run Script') {
+      steps {
+        // Run Node.js script
+        sh 'node scripts/db-migration.js'
+
+        // Run Python script
+        sh 'python scripts/process_data.py'
+
+        // Make executable and run shell script
+        sh 'chmod +x scripts/deploy.sh && ./scripts/deploy.sh'
+      }
+    }
+```
+
+### 2. Windows Agents (`bat` or `powershell`)
+On Windows agents, use `bat` or `powershell` directives:
+```groovy
+    stage('Run Script on Windows') {
+      steps {
+        // Using Command Prompt (bat)
+        bat 'node scripts\\db-migration.js'
+
+        // Using PowerShell
+        powershell 'node scripts/db-migration.js'
+      }
+    }
+```
+
+---
 
 ## Next Steps (We Will Add Later)
 

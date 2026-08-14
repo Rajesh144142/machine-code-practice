@@ -1,4 +1,4 @@
-﻿# CI/CD Learning - GitHub Actions (CI/CD)
+# CI/CD Learning - GitHub Actions (CI/CD)
 
 This README documents a GitHub Actions workflow that covers CI and CD with multiple environments, AI quality checks, and deployment notifications. It matches the requirements you shared: tests before deploy, optional AI checks for readability, branch-based environments, blocked merges on failure, and deploy notifications.
 
@@ -516,6 +516,42 @@ jobs:
   call_tests:
     uses: ./.github/workflows/reusable-tests.yml
 ```
+
+## Running a Particular File/Script
+
+In GitHub Actions, you use the `run` command inside a job step. The runner's shell environment executes it (Bash on Linux/macOS, PowerShell on Windows).
+
+### 1. Running a JavaScript / Node.js File
+Ensure dependencies are installed before running scripts:
+```yaml
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run specific migration script
+        run: node scripts/db-migration.js
+```
+
+### 2. Running a Python Script
+```yaml
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Run script
+        run: python scripts/process_data.py
+```
+
+### 3. Running a Shell Script (`.sh`)
+You must make the script executable (`chmod +x`) on Linux runners first:
+```yaml
+      - name: Run shell script
+        run: |
+          chmod +x scripts/deploy.sh
+          ./scripts/deploy.sh
+```
+
+---
 
 ## Next Practice
 
