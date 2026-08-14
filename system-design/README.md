@@ -121,8 +121,8 @@ In a URL shortener system design, you are mapping a 7-character `shortCode` to a
 * **Functional**: Shorten long URL $\rightarrow$ 7-character Base62 string. Redirecting via the short URL $\rightarrow$ 302 redirect to the original URL.
 * **Non-Functional**: High availability, minimal redirection latency (<50ms).
 * **Scale Calculations**: 100M URLs created/day. 
-  * Writes QPS: $100\text{M} / 86400 \approx 1,160\text{ writes/sec}$.
-  * Read QPS (ratio 10:1): $11,600\text{ reads/sec}$.
+  * Write Queries Per Second (QPS): $100\text{M} / 86400 \approx 1,160\text{ writes/sec}$.
+  * Read Queries Per Second (QPS) (ratio 10:1): $11,600\text{ reads/sec}$.
   * Storage (5 years): $100\text{M} \times 5 \text{ years} \times 365 \text{ days} \times 500\text{ bytes} \approx 90\text{ Terabytes}$.
 
 #### Step 2: API Contract Design
