@@ -11,6 +11,7 @@ This guide covers the high-level infrastructure components (DNS, CDN, Caching, D
   - [4. Database Selection Blueprint (SQL vs. NoSQL)](#4-database-selection-blueprint-sql-vs-nosql)
   - [5. Capacity Estimation & Peak Load Scaling](#5-capacity-estimation--peak-load-scaling)
 - [Part 2: Top 10 System Design Questions (Step-by-Step Blueprints)](#part-2-top-10-system-design-questions-step-by-step-blueprints)
+- [Part 3: What to Expect AFTER the Initial Architecture Design](#part-3-what-to-expect-after-the-initial-architecture-design)
 
 ---
 
@@ -160,9 +161,46 @@ When estimating resources in system design interviews, **never size your system 
 * `POST /api/v1/shorten` $\rightarrow$ Request: `{"longUrl": "..."}` $\rightarrow$ Response: `{"shortUrl": "..."}`
 * `GET /{shortCode}` $\rightarrow$ Redirects user (302 Found) to the long URL.
 
-#### Step 3: Database Selection
-* **NoSQL Key-Value (DynamoDB)**: Key: `short_code` (Partition Key), Value: `long_url`.
-* **Reason**: Scaling 90TB of simple key-value records with zero joins is significantly easier with NoSQL partitioning than SQL sharding. For peak load (35,000 read QPS), NoSQL dynamically partitions data using hashing to distribute hot reads across nodes automatically. Caching (Redis) is placed in front to serve 90% of reads, keeping database load low.
+#### Step 3: Database Selection & Capacity Sizing
+
+We must decide between a NoSQL (DynamoDB) and SQL (PostgreSQL) database. Let's model the resource requirements (servers, CPUs, replicas) for both options to handle the peak loads.
+
+---
+
+### Option A: SQL Database (PostgreSQL Cluster)
+To handle the peak load of **3,500 writes/sec** and **35,000 reads/sec**, we provision database nodes on AWS `db.m5.2xlarge` instances (**8 vCPUs, 32GB RAM**). 
+* **Sizing Benchmark**: A single `db.m5.2xlarge` PostgreSQL instance can handle:
+  * **1,000 write transactions/sec** (limited by disk I/O and transaction commits).
+  * **10,000 read queries/sec** (served from memory buffers).
+
+#### 1. Writing Capacity Sizing (Primary Master Database):
+* We must support **3,500 writes/sec** at peak.
+* Since a single SQL database instance can only support 1,000 writes/sec, we **cannot use a single master database**. We must **Shard (Partition)** the database.
+* **Number of Shards Needed**:
+  $$\text{Shards} = \frac{3,500 \text{ peak writes/sec}}{1,000 \text{ writes/sec per instance}} = 3.5 \approx \mathbf{4 \text{ Database Shards}}$$
+* *Implementation*: We split the database into 4 independent primary master databases (Shard 0 to Shard 3). We route writes using a hash of the short code: `shard_id = Hash(shortCode) % 4`.
+
+#### 2. Reading Capacity Sizing (Read Replicas):
+* We must support **35,000 reads/sec** at peak.
+* We place a **Redis caching layer** in front of our database, achieving a **90% cache hit ratio**.
+* **Database Read Load**: Only 10% of reads hit the database.
+  $$\text{Database Reads} = 35,000 \text{ reads/sec} \times 0.10 = \mathbf{3,500 \text{ reads/sec}}$$
+* **Distributing reads across the 4 shards**:
+  $$\text{Reads per Shard} = \frac{3,500 \text{ reads/sec}}{4 \text{ shards}} = \mathbf{875 \text{ reads/sec per shard}}$$
+* Since a single read replica handles 10,000 reads/sec, **1 replica per shard** is more than enough to cover the reads, even if the cache has a temporary failure.
+* **SQL Cluster Sizing**: 
+  * **4 Sharded Primary Masters** (for writes).
+  * **4 Read Replicas** (1 attached to each master for reads).
+  * **Total SQL Instances**: **8 Database Servers** (8 vCPUs / 32GB RAM each).
+
+---
+
+### Option B: NoSQL Database (DynamoDB) - RECOMMENDED
+* **Why it fits**: 
+  1. **Managed Scaling**: DynamoDB dynamically scales partitioning automatically. It hashes the partition key (`short_code`) to route requests to different storage nodes without application-level sharding logic.
+  2. **Cost-Effective**: We configure DynamoDB with **3,500 Write Capacity Units (WCU)** and **3,500 Read Capacity Units (RCU)** (assuming 90% read cache hits).
+  3. **Zero Joins**: Our data access is 100% key-value lookup (`shortCode -> longUrl`), which matches NoSQL patterns perfectly.
+
 
 #### Step 4: High-Level Architecture
 ```text
@@ -362,3 +400,34 @@ Decouple services using **Message Queues**:
 * **URL Frontier**: The link repository queue.
 * **Politeness Engine**: Routes requests to target domains through dedicated queues with delays, checking `robots.txt` first.
 * **Deduplication Engine**: Uses **Bloom Filters** to check if a URL has already been visited, and **SimHash** to check if page content is duplicate.
+
+---
+
+## Part 3: What to Expect AFTER the Initial Architecture Design
+
+Once you present the boxes and arrows of your high-level architecture, the interviewer will immediately start probe-testing the design. You can expect follow-up questions in four categories:
+
+### 1. Failures and Outages (The "Chaos" Questions)
+* **Q: "What happens if your Redis cache crashes? How do you prevent your database from going down?"**
+  * **Answer**: If the cache fails, a surge of read requests (Cache Stampede) will hit the database and crash it. To prevent this, we implement **Circuit Breakers** on the database read-bypass layer. If the DB failure rate spikes, we trip the circuit and return stale/fallback data or fail-fast. We also use **Mutex Locks** (single-flight) so only one app request goes to rebuild the cache, keeping database hits to a trickle.
+* **Q: "Your Primary database master just went offline. How does the system recover?"**
+  * **Answer**: We use a health-check coordinator (e.g., Zookeeper or Sentinel) to detect the primary master's death. It automatically promotes one of the read replicas to be the new master. We also need to configure the application servers to route write traffic to the new IP/DNS master node automatically.
+
+---
+
+### 2. High Scale and Bottlenecks (The "10x Traffic" Questions)
+* **Q: "If our write traffic spikes 10x, your single SQL master DB will choke on disk commits. How do you scale writes?"**
+  * **Answer**: We scale writes in two ways:
+    1. **Asynchronous Write Buffering**: Instead of writing directly to the database synchronously, the API writes the request payload to a high-throughput **Message Queue** (like Kafka) and returns. A worker pool drains the queue and writes to the DB in micro-batches, smoothing out the traffic spike.
+    2. **Horizontal Database Sharding**: We split the database into multiple physical masters and hash-partition the rows (e.g., by `User_ID`) across the database shards.
+* **Q: "How do you prevent the 'Hot Key' problem (e.g., millions of users querying a single celebrity's profile or a viral URL short link) from crushing a single Cache Node?"**
+  * **Answer**: We implement **Local Memory Caching** (In-App cache) on the web app servers themselves using a small cache (like LRU) with a short TTL (e.g., 5 seconds). The most popular keys are resolved inside the local node before hitting Redis over the network. We also use **Consistent Hashing with Virtual Nodes** to distribute keys evenly.
+
+---
+
+### 3. Data Consistency and Synchronization
+* **Q: "If you scale horizontally with read replicas, how do you prevent the 'Read-Your-Own-Writes' consistency problem?"**
+  * **Answer**: When a user writes data (e.g. edits a profile), the update takes time to replicate to read replicas (replication lag). If the user refreshes, they might see old data. To fix this, we route requests from the user who made the write directly to the **Primary Master database** for a small window (e.g., 5 seconds) before routing them back to the read replicas.
+* **Q: "How do you handle out-of-order messages in your Chat application?"**
+  * **Answer**: In WebSockets, we cannot guarantee sequence at the network level. To resolve this, we append a **Sequence ID** (like a monotonically increasing counter or Snowflake ID) to every message at the server. The client application sorts the messages locally in memory by this sequence ID before rendering them to the UI.
+
