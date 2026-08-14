@@ -1,6 +1,16 @@
 # System Design Interview Master Guide & Core Architectures
 
-This guide covers the high-level infrastructure components (DNS, CDN, Caching, DB Selection) followed by detailed, step-by-step blueprints for the most asked system design questions.
+This guide covers the high-level infrastructure components (DNS, CDN, Caching, DB Selection, Sizing) followed by detailed, step-by-step blueprints for the most asked system design questions.
+
+## Contents
+
+- [Part 1: High-Level Infrastructure Fundamentals](#part-1-high-level-infrastructure-fundamentals)
+  - [1. DNS (Domain Name System) Architecture](#1-dns-domain-name-system-architecture)
+  - [2. CDN (Content Delivery Network) Architecture](#2-cdn-content-delivery-network-architecture)
+  - [3. Caching Levels & Types](#3-caching-levels--types)
+  - [4. Database Selection Blueprint (SQL vs. NoSQL)](#4-database-selection-blueprint-sql-vs-nosql)
+  - [5. Capacity Estimation & Peak Load Scaling](#5-capacity-estimation--peak-load-scaling)
+- [Part 2: Top 10 System Design Questions (Step-by-Step Blueprints)](#part-2-top-10-system-design-questions-step-by-step-blueprints)
 
 ---
 
@@ -111,6 +121,21 @@ In a URL shortener system design, you are mapping a 7-character `shortCode` to a
 
 ---
 
+### 5. Capacity Estimation & Peak Load Scaling
+
+When estimating resources in system design interviews, **never size your system only for average loads**. Traffic has natural spikes during active hours (e.g. midday peak, promotions).
+
+#### The Peak Multiplier Rule
+* In system design interviews, calculate the daily average QPS, then apply a **peak multiplier (typically 2x to 5x)** to calculate the resource demands during hot hours.
+* Size your databases, server instances, and network bandwidth around this **Peak QPS**.
+* **Formula**:
+  $$\text{Average QPS} = \frac{\text{Daily Requests}}{86,400 \text{ seconds}}$$
+  $$\text{Peak QPS} = \text{Average QPS} \times \text{Peak Multiplier (e.g., 3x)}$$
+
+---
+
+---
+
 ## Part 2: Top 10 System Design Questions (Step-by-Step Blueprints)
 
 ---
@@ -120,10 +145,16 @@ In a URL shortener system design, you are mapping a 7-character `shortCode` to a
 #### Step 1: Requirements & Scope
 * **Functional**: Shorten long URL $\rightarrow$ 7-character Base62 string. Redirecting via the short URL $\rightarrow$ 302 redirect to the original URL.
 * **Non-Functional**: High availability, minimal redirection latency (<50ms).
-* **Scale Calculations**: 100M URLs created/day. 
-  * Write Queries Per Second (QPS): $100\text{M} / 86400 \approx 1,160\text{ writes/sec}$.
-  * Read Queries Per Second (QPS) (ratio 10:1): $11,600\text{ reads/sec}$.
-  * Storage (5 years): $100\text{M} \times 5 \text{ years} \times 365 \text{ days} \times 500\text{ bytes} \approx 90\text{ Terabytes}$.
+* **Scale Calculations**:
+  * 100M URLs created/day. 
+  * **Average Write QPS**: $100\text{M} / 86400 \approx 1,160\text{ writes/sec}$.
+  * **Average Read QPS** (ratio 10:1): $11,600\text{ reads/sec}$.
+  * **Peak Traffic (3x Multiplier)**:
+    * **Peak Write QPS**: $1,160 \times 3 = \mathbf{3,480 \approx 3,500 \text{ writes/sec}}$.
+    * **Peak Read QPS**: $11,600 \times 3 = \mathbf{34,800 \approx 35,000 \text{ reads/sec}}$.
+  * **Storage (5 years)**: $100\text{M} \times 5 \text{ years} \times 365 \text{ days} \times 500\text{ bytes} \approx \mathbf{90\text{ Terabytes}}$.
+  * **Network Bandwidth (Peak)**:
+    * Peak Read Bandwidth: $35,000 \text{ reads/sec} \times 500 \text{ bytes} \approx \mathbf{17.5 \text{ MB/sec}}$ (140 Mbps).
 
 #### Step 2: API Contract Design
 * `POST /api/v1/shorten` $\rightarrow$ Request: `{"longUrl": "..."}` $\rightarrow$ Response: `{"shortUrl": "..."}`
@@ -131,7 +162,7 @@ In a URL shortener system design, you are mapping a 7-character `shortCode` to a
 
 #### Step 3: Database Selection
 * **NoSQL Key-Value (DynamoDB)**: Key: `short_code` (Partition Key), Value: `long_url`.
-* **Reason**: Scaling 90TB of simple key-value records with zero joins is significantly easier with NoSQL partitioning than SQL sharding.
+* **Reason**: Scaling 90TB of simple key-value records with zero joins is significantly easier with NoSQL partitioning than SQL sharding. For peak load (35,000 read QPS), NoSQL dynamically partitions data using hashing to distribute hot reads across nodes automatically. Caching (Redis) is placed in front to serve 90% of reads, keeping database load low.
 
 #### Step 4: High-Level Architecture
 ```text
